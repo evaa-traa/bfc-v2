@@ -1,0 +1,12 @@
+{
+  "name": "beautiful-flowise-chat",
+  "version": "2.0.3",
+  "description": "Modern, customizable chat widget for Flowise AI instances",
+  "main": "dist/chat.js",
+  "scripts": {
+    "build": "cat src/styles.css src/chat.js > dist/chat.js"
+  },
+  "keywords": ["flowise", "chat", "widget", "ai", "chatbot"],
+  "author": "unknownfriend00007",
+  "license": "MIT"
+}

@@ -1,0 +1,63 @@
+Custom License for Beautiful Flowise Chat Widget
+Copyright (c) 2025 RPS (unknownfriend00007)
+
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+1. DEFINITIONS
+   "Software" refers to the Beautiful Flowise Chat Widget and associated files.
+   "You" refers to the individual or legal entity using this Software.
+   "Commercial Use" means using the Software for commercial advantage or monetary compensation.
+
+2. GRANT OF LICENSE
+   Subject to the terms and conditions below, permission is hereby granted to:
+   - Use the Software for personal, educational, or non-commercial purposes
+   - Modify the Software for personal use only
+   - Access the Software via CDN for legitimate integration with Flowise AI
+
+3. RESTRICTIONS
+   You MAY NOT:
+   a) Use this Software for commercial purposes without written permission
+   b) Resell, sublicense, or distribute this Software as part of a competing product
+   c) Remove or modify copyright notices, branding, or attribution links
+   d) Reverse engineer, decompile, or attempt to extract source code (for minified versions)
+   e) Host this Software on alternative CDNs or file-sharing platforms
+   f) Rebrand or claim this Software as your own work
+
+4. ATTRIBUTION REQUIRED
+   All copies or substantial portions of the Software must retain:
+   - Copyright notice: "Created by RPS"
+   - Link to original repository: https://github.com/unknownfriend00007/beautiful-flowise-chat
+   - "Powered by RPS" branding in the widget footer (visible to end users)
+
+5. COMMERCIAL LICENSING
+   For commercial use, custom branding, or premium features, contact:
+   Email: mail.rps.active@proton.me
+   
+   Commercial licenses include:
+   - White-label options (remove branding)
+   - Priority support and custom features
+   - Indemnification and warranty coverage
+
+6. NO WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
+   FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
+   OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY.
+
+7. TERMINATION
+   This license automatically terminates if you violate any of these terms.
+   Upon termination, you must cease all use and destroy all copies.
+
+8. GOVERNING LAW
+   This license shall be governed by and construed in accordance with the laws
+   of India, without regard to its conflict of law provisions.
+
+9. CONTACT
+   For questions, permissions, or commercial licensing inquiries:
+   - Email: mail.rps.active@proton.me
+   - GitHub: https://github.com/unknownfriend00007
+
+---
+
+By using this Software, you acknowledge that you have read this License,
+understand it, and agree to be bound by its terms and conditions.
