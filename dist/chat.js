@@ -1,4 +1,4 @@
-﻿/* Beautiful Flowise Chat Widget Styles v1.1.2 */
+/* Beautiful Flowise Chat Widget Styles v1.1.2 */
 
 window.BEAUTIFUL_FLOWISE_STYLES = `
 :root {
@@ -1485,4 +1485,3 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
     };
 
 })();
-
