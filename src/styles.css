@@ -106,6 +106,42 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
     overflow: hidden;
 }
 
+.bf-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 1;
+}
+
+.bf-header-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.bf-header-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2;
+}
+
+.bf-header-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.bf-header-btn:active {
+    transform: translateY(0);
+}
+
 .bf-header::before {
     content: '';
     position: absolute;
@@ -271,6 +307,20 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
 }
 
 /* Markdown formatting in bot messages */
+.bf-container .bf-message-text p,
+.bf-container .bf-message-text li {
+    color: var(--bf-text-color);
+    opacity: 1;
+}
+
+.bf-container .bf-message-text blockquote {
+    margin: 8px 0;
+    padding: 10px 12px;
+    border-left: 3px solid var(--bf-border-color);
+    background: #f9fafb;
+    color: var(--bf-text-color);
+}
+
 .bf-bot-message .bf-message-text p {
     margin: 0 0 8px 0;
 }
@@ -455,6 +505,12 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
     border-color: var(--bf-primary-color);
 }
 
+.bf-input:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    background: #f3f4f6;
+}
+
 .bf-send-btn {
     background: linear-gradient(135deg, var(--bf-primary-color), var(--bf-primary-dark));
     color: white;
@@ -480,6 +536,13 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
     transform: scale(0.95);
 }
 
+.bf-send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
 .bf-footer {
     padding: 8px;
     text-align: center;
@@ -496,6 +559,59 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
 
 .bf-branding:hover {
     color: var(--bf-primary-color);
+}
+
+.bf-human-check {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(10px);
+    z-index: 20;
+}
+
+.bf-human-check-card {
+    width: 100%;
+    max-width: 360px;
+    border-radius: 14px;
+    border: 1px solid var(--bf-border-color);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
+    padding: 18px;
+}
+
+.bf-human-check-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--bf-text-color);
+}
+
+.bf-human-check-subtitle {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--bf-text-secondary);
+    line-height: 1.4;
+}
+
+.bf-human-check-widget {
+    margin-top: 14px;
+    display: flex;
+    justify-content: center;
+}
+
+.bf-human-check-status {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--bf-text-secondary);
+}
+
+.bf-human-check-error {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #b91c1c;
 }
 
 @media (max-width: 480px) {
@@ -572,9 +688,23 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
     border-color: #4b5563;
 }
 
+.bf-theme-dark .bf-input:disabled {
+    background: #374151;
+}
+
 .bf-theme-dark .bf-bot-message .bf-message-text code {
     background: #4b5563;
     color: #fbbf24;
+}
+
+.bf-theme-dark .bf-human-check {
+    background: rgba(17, 24, 39, 0.9);
+}
+
+.bf-theme-dark .bf-human-check-card {
+    background: rgba(31, 41, 55, 0.95);
+    border-color: #374151;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
 }
 
 .bf-theme-minimal {

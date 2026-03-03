@@ -1,126 +1,37 @@
-/**
- * Beautiful Flowise Chat Widget v2.1.0-rc4
- * Font Size Improvements
- * 
- * v2.1.0-rc4:
- * - Increased font sizes to match Perplexity (15px base)
- * - Better readability on desktop and mobile
- * 
- * v2.1.0-rc3:
- * - Fixed send button Unicode rendering issue
- * 
- * v2.1.0-rc2:
- * - Removed excessive paragraph spacing (Primus V2 style)
- * - Format markdown on EVERY render (no aggressive caching)
- * - Compact line-height and spacing
- * 
- * v2.1.0-rc1:
- * - Real-time markdown formatting during streaming
- * - Batched updates every 50ms
- * 
- * v2.1.0-beta:
- * - Integrated marked.js + DOMPurify
- * - Primus V2-style layout (bot: 95%, user: 60% max)
- * - Table support
- * 
- * Created by RPS | Inspired by Primus V2
- */
+/* Beautiful Flowise Chat Widget Styles v1.1.2 */
 
-(function() {
-    'use strict';
-
-    // Load marked.js and DOMPurify from CDN
-    const loadLibrary = (src, name) => {
-        return new Promise((resolve, reject) => {
-            if (window[name]) {
-                resolve(window[name]);
-                return;
-            }
-            const script = document.createElement('script');
-            script.src = src;
-            script.onload = () => resolve(window[name]);
-            script.onerror = () => reject(new Error(`Failed to load ${name}`));
-            document.head.appendChild(script);
-        });
-    };
-
-    const MARKED_CDN = 'https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js';
-    const DOMPURIFY_CDN = 'https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js';
-
-    const defaults = {
-        theme: 'modern',
-        primaryColor: '#6366f1',
-        primaryDarkColor: null,
-        position: 'bottom-right',
-        width: '400px',
-        height: '600px',
-        title: 'AI Assistant',
-        subtitle: 'Online',
-        welcomeMessage: 'Hi! How can I help you today?',
-        placeholder: 'Type your message...',
-        sendButtonText: '➤',
-        showTimestamp: true,
-        enableStreaming: true,
-        enableMarkdown: true,
-        clearChatOnReload: false,
-        confirmOnReset: true,
-        maxMessages: 100,
-        requestTimeout: 30000,
-        debug: false,
-        avatar: '🤖',
-        mode: 'popup',
-        customUserMessageBg: null,
-        customUserMessageText: null,
-        customChatBg: null
-    };
-
-    const CONSTANTS = {
-        FOCUS_DELAY: 100,
-        SCROLL_THROTTLE: 100,
-        STREAM_UPDATE_INTERVAL: 50,
-        STREAM_MIN_CHARS: 3,
-        MAX_INPUT_HEIGHT: 120,
-        MIN_REQUEST_INTERVAL: 500,
-        ALLOWED_URL_SCHEMES: ['http:', 'https:', 'mailto:', 'tel:']
-    };
-
-    const styles = `
+window.BEAUTIFUL_FLOWISE_STYLES = `
 :root {
     --bf-primary-color: #6366f1;
     --bf-primary-dark: #4f46e5;
-    --bf-custom-user-msg-bg: rgba(99, 102, 241, 0.15);
-    --bf-custom-user-msg-text: #1f2937;
-    --bf-custom-chat-bg: #ffffff;
+    --bf-bg-color: #ffffff;
+    --bf-text-color: #1f2937;
+    --bf-text-secondary: #6b7280;
+    --bf-border-color: #e5e7eb;
+    --bf-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    --bf-radius: 16px;
 }
 
 .bf-container * {
     box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
 .bf-container {
     position: fixed;
     z-index: 999999;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
-.bf-mode-popup {
+.bf-bottom-right {
     bottom: 20px;
     right: 20px;
 }
 
-.bf-mode-popup.bf-bottom-left { 
-    bottom: 20px; 
+.bf-bottom-left {
+    bottom: 20px;
     left: 20px;
-    right: auto;
-}
-
-.bf-mode-fullscreen {
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    bottom: auto;
-    right: auto;
 }
 
 .bf-chat-button {
@@ -130,62 +41,58 @@
     background: linear-gradient(135deg, var(--bf-primary-color), var(--bf-primary-dark));
     border: none;
     cursor: pointer;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-    transition: transform 0.3s;
+    box-shadow: var(--bf-shadow);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    overflow: hidden;
 }
 
-.bf-mode-fullscreen .bf-chat-button {
-    display: none !important;
+.bf-chat-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2);
 }
 
-.bf-chat-button:hover { transform: scale(1.1); }
-.bf-button-icon { width: 28px; height: 28px; color: white; stroke-width: 2; }
+.bf-chat-button:active {
+    transform: scale(0.95);
+}
+
+.bf-button-icon {
+    width: 28px;
+    height: 28px;
+    color: white;
+    stroke-width: 2;
+    transition: transform 0.3s ease;
+}
 
 .bf-chat-window {
     position: absolute;
-    background: white;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    animation: slideUp 0.3s ease;
-}
-
-.bf-mode-popup .bf-chat-window {
     bottom: 80px;
     right: 0;
     width: 400px;
     max-width: calc(100vw - 40px);
     height: 600px;
     max-height: calc(100vh - 120px);
-    border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-}
-
-.bf-mode-popup.bf-bottom-left .bf-chat-window {
-    left: 0;
-    right: auto;
-}
-
-.bf-mode-fullscreen .bf-chat-window {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    right: 0;
-    width: 100vw;
-    height: 100vh;
-    border-radius: 0;
-    box-shadow: none;
-    display: flex !important;
-    animation: none;
+    background: var(--bf-bg-color);
+    border-radius: var(--bf-radius);
+    box-shadow: var(--bf-shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: slideUp 0.3s ease;
 }
 
 @keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .bf-header {
@@ -195,52 +102,116 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
 }
-
-.bf-header-content { display: flex; align-items: center; gap: 12px; flex: 1; }
-
-.bf-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-}
-
-.bf-title { font-size: 16px; font-weight: 600; }
-.bf-subtitle { font-size: 12px; opacity: 0.9; }
 
 .bf-header-actions {
     display: flex;
-    gap: 8px;
     align-items: center;
+    gap: 10px;
+    z-index: 1;
 }
 
-.bf-reset-btn {
-    background: rgba(255,255,255,0.2);
+.bf-header-btn {
+    background: rgba(255, 255, 255, 0.2);
     border: none;
     color: white;
     width: 32px;
     height: 32px;
     border-radius: 8px;
     cursor: pointer;
-    font-size: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.2s;
+    transition: background 0.2s, transform 0.2s;
 }
 
-.bf-reset-btn:hover {
-    background: rgba(255,255,255,0.3);
+.bf-header-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2;
+}
+
+.bf-header-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.bf-header-btn:active {
+    transform: translateY(0);
+}
+
+.bf-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    animation: pulse 3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.bf-header-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 1;
+}
+
+.bf-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    backdrop-filter: blur(10px);
+}
+
+.bf-header-text {
+    flex: 1;
+}
+
+.bf-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.bf-subtitle {
+    font-size: 12px;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.bf-subtitle::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: #4ade80;
+    border-radius: 50%;
+    display: inline-block;
+    animation: blink 2s ease-in-out infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
 }
 
 .bf-minimize-btn {
-    background: rgba(255,255,255,0.2);
+    background: rgba(255, 255, 255, 0.2);
     border: none;
     color: white;
     width: 32px;
@@ -251,31 +222,45 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background 0.2s;
+    z-index: 1;
 }
 
-.bf-mode-fullscreen .bf-minimize-btn {
-    display: none;
+.bf-minimize-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .bf-messages {
     flex: 1;
     overflow-y: auto;
     padding: 20px;
-    background: #f9fafb;
+    background: linear-gradient(180deg, #f9fafb 0%, #ffffff 100%);
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
-.bf-messages::-webkit-scrollbar { width: 6px; }
-.bf-messages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+.bf-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.bf-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.bf-messages::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.bf-messages::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
 
 .bf-message {
-    display: flex !important;
-    animation: fadeIn 0.3s;
-    width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
+    display: flex;
+    gap: 10px;
+    animation: fadeIn 0.3s ease;
 }
 
 @keyframes fadeIn {
@@ -283,273 +268,248 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
-.bf-message.bf-bot-message { 
-    justify-content: flex-start !important;
+.bf-bot-message {
+    align-self: flex-start;
 }
 
-.bf-message.bf-user-message { 
-    justify-content: flex-end !important;
+.bf-user-message {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+}
+
+.bf-message-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--bf-primary-color), var(--bf-primary-dark));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
 }
 
 .bf-message-content {
-    display: flex !important;
-    flex-direction: column !important;
-    margin: 0 !important;
-    padding: 0 !important;
-}
-
-/* Primus V2-style layout */
-.bf-bot-message .bf-message-content {
-    align-items: flex-start !important;
-    max-width: 95% !important;
-    width: 100% !important;
-}
-
-.bf-user-message .bf-message-content {
-    align-items: flex-end !important;
-    max-width: 60% !important;
-    width: fit-content !important;
+    max-width: 75%;
+    min-width: 60px;
 }
 
 .bf-message-text {
-    padding: 12px 16px !important;
-    border-radius: 16px;
-    font-size: 15px;
-    line-height: 1.6;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    word-break: keep-all;
-    hyphens: none;
-    white-space: normal;
-    display: inline-block !important;
-    width: fit-content !important;
-    max-width: 100% !important;
-    text-align: left !important;
-    margin: 0 !important;
-}
-
-.bf-bot-message .bf-message-text {
     background: white;
-    color: #1f2937;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    width: 100% !important;
+    padding: 12px 16px;
+    border-radius: 16px;
+    color: var(--bf-text-color);
+    font-size: 14px;
+    line-height: 1.6;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    word-wrap: break-word;
+    word-break: break-word;
 }
 
-.bf-user-message .bf-message-text {
-    background: var(--bf-custom-user-msg-bg) !important;
-    color: var(--bf-custom-user-msg-text) !important;
-    border: none !important;
-    box-shadow: none !important;
-    width: fit-content !important;
-    white-space: pre-wrap;
+/* Markdown formatting in bot messages */
+.bf-container .bf-message-text p,
+.bf-container .bf-message-text li {
+    color: var(--bf-text-color);
+    opacity: 1;
 }
 
-.bf-message-time {
-    font-size: 11px;
-    color: #6b7280;
-    margin-top: 4px;
-    padding: 0 4px;
+.bf-container .bf-message-text blockquote {
+    margin: 8px 0;
+    padding: 10px 12px;
+    border-left: 3px solid var(--bf-border-color);
+    background: #f9fafb;
+    color: var(--bf-text-color);
 }
 
-/* Perplexity-style COMPACT content styling with better readability */
-.bf-message-text p { 
-    margin: 0 0 10px 0;
+.bf-bot-message .bf-message-text p {
+    margin: 0 0 8px 0;
 }
 
-.bf-message-text p:last-child { 
-    margin-bottom: 0; 
-}
-
-.bf-message-text p:only-child {
+.bf-bot-message .bf-message-text p:last-child {
     margin-bottom: 0;
 }
 
-.bf-message-text strong { 
-    font-weight: 600; 
-    color: #111827; 
+.bf-bot-message .bf-message-text strong {
+    font-weight: 600;
+    color: var(--bf-text-color);
 }
 
-.bf-message-text em { 
-    font-style: italic; 
+.bf-bot-message .bf-message-text em {
+    font-style: italic;
 }
 
-.bf-message-text code {
+.bf-bot-message .bf-message-text code {
     background: #f3f4f6;
     padding: 2px 6px;
     border-radius: 4px;
     font-family: 'Courier New', monospace;
-    font-size: 14px;
+    font-size: 13px;
     color: #be123c;
 }
 
-.bf-message-text pre {
+.bf-bot-message .bf-message-text pre {
     background: #1f2937;
     color: #f9fafb;
     padding: 12px;
     border-radius: 8px;
     overflow-x: auto;
-    margin: 10px 0;
+    margin: 8px 0;
 }
 
-.bf-message-text pre code {
+.bf-bot-message .bf-message-text pre code {
     background: transparent;
-    color: #f9fafb;
     padding: 0;
-    font-size: 14px;
+    color: #f9fafb;
+    font-size: 13px;
 }
 
-.bf-message-text ul,
-.bf-message-text ol {
-    margin: 10px 0;
-    padding-left: 24px;
+.bf-bot-message .bf-message-text ul,
+.bf-bot-message .bf-message-text ol {
+    margin: 8px 0;
+    padding-left: 20px;
 }
 
-.bf-message-text ul {
-    list-style-type: disc;
+.bf-bot-message .bf-message-text li {
+    margin: 4px 0;
 }
 
-.bf-message-text ol {
-    list-style-type: decimal;
-}
-
-.bf-message-text li { 
-    margin: 5px 0;
-    line-height: 1.6;
-    display: list-item;
-}
-
-.bf-message-text a {
+.bf-bot-message .bf-message-text a {
     color: var(--bf-primary-color);
-    text-decoration: underline;
+    text-decoration: none;
+    border-bottom: 1px solid var(--bf-primary-color);
 }
 
-.bf-message-text h1,
-.bf-message-text h2,
-.bf-message-text h3 {
+.bf-bot-message .bf-message-text a:hover {
+    opacity: 0.8;
+}
+
+.bf-bot-message .bf-message-text h1,
+.bf-bot-message .bf-message-text h2,
+.bf-bot-message .bf-message-text h3 {
+    margin: 12px 0 8px 0;
     font-weight: 600;
-    color: #111827;
-    margin: 14px 0 10px 0;
-    line-height: 1.4;
 }
 
-.bf-message-text h1:first-child,
-.bf-message-text h2:first-child,
-.bf-message-text h3:first-child {
-    margin-top: 0;
+.bf-bot-message .bf-message-text h1 {
+    font-size: 18px;
 }
 
-.bf-message-text h1 { font-size: 20px; }
-.bf-message-text h2 { font-size: 18px; }
-.bf-message-text h3 { font-size: 16px; }
+.bf-bot-message .bf-message-text h2 {
+    font-size: 16px;
+}
 
-/* Table styling (Perplexity-sized) */
-.bf-message-text table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 12px 0;
+.bf-bot-message .bf-message-text h3 {
     font-size: 14px;
-    line-height: 1.5;
-    display: block;
-    overflow-x: auto;
-    border: 1px solid #e5e7eb;
 }
 
-.bf-message-text th,
-.bf-message-text td {
-    border: 1px solid #e5e7eb;
-    padding: 10px 12px;
-    text-align: left;
+.bf-user-message .bf-message-text {
+    background: linear-gradient(135deg, var(--bf-primary-color), var(--bf-primary-dark));
+    color: #ffffff !important;
+    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.3);
 }
 
-.bf-message-text thead th {
-    background: #f3f4f6;
-    font-weight: 600;
-    color: #111827;
+.bf-message-time {
+    font-size: 11px;
+    color: var(--bf-text-secondary);
+    margin-top: 4px;
+    padding: 0 4px;
 }
 
-.bf-message-text tbody tr:nth-child(odd) {
-    background: white;
-}
-
-.bf-message-text tbody tr:nth-child(even) {
-    background: #f9fafb;
-}
-
-.bf-loading-dots {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.bf-loading-dots span {
-    width: 8px;
-    height: 8px;
-    background: var(--bf-primary-color);
-    border-radius: 50%;
-    animation: pulse-dot 1.4s ease-in-out infinite;
-}
-
-.bf-loading-dots span:nth-child(1) { animation-delay: 0s; }
-.bf-loading-dots span:nth-child(2) { animation-delay: 0.2s; }
-.bf-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes pulse-dot {
-    0%, 60%, 100% { 
-        transform: scale(0.8);
-        opacity: 0.5;
-    }
-    30% { 
-        transform: scale(1.2);
-        opacity: 1;
-    }
-}
-
-.bf-streaming .bf-message-text {
-    will-change: contents;
+.bf-error .bf-message-text {
+    background: #fee2e2;
+    color: #991b1b;
 }
 
 .bf-streaming .bf-cursor {
     display: inline-block;
-    width: 2px;
-    height: 1em;
-    background: var(--bf-primary-color);
+    animation: blink-cursor 1s step-end infinite;
     margin-left: 2px;
-    animation: blink-cursor 1s steps(2, start) infinite;
-    vertical-align: text-bottom;
+    color: var(--bf-primary-color);
+    font-weight: bold;
 }
 
 @keyframes blink-cursor {
-    50% { opacity: 0; }
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+
+.bf-typing {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 20px 10px;
+}
+
+.bf-typing-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--bf-primary-color), var(--bf-primary-dark));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.bf-typing-dots {
+    background: white;
+    padding: 12px 16px;
+    border-radius: 16px;
+    display: flex;
+    gap: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.bf-typing-dots span {
+    width: 8px;
+    height: 8px;
+    background: #cbd5e1;
+    border-radius: 50%;
+    animation: typing 1.4s ease-in-out infinite;
+}
+
+.bf-typing-dots span:nth-child(1) { animation-delay: 0s; }
+.bf-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.bf-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typing {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-10px); opacity: 1; }
 }
 
 .bf-input-container {
     padding: 16px;
     background: white;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid var(--bf-border-color);
     display: flex;
     gap: 10px;
     align-items: flex-end;
-    flex-shrink: 0;
 }
 
 .bf-input {
     flex: 1;
-    border: 2px solid #e5e7eb;
+    border: 2px solid var(--bf-border-color);
     border-radius: 12px;
     padding: 12px 16px;
-    font-size: 15px;
+    font-size: 14px;
     font-family: inherit;
     resize: none;
     outline: none;
     transition: border-color 0.2s;
     max-height: 120px;
     min-height: 44px;
-    color: #1f2937;
-    line-height: 1.5;
+    color: var(--bf-text-color);
 }
 
-.bf-input:focus { border-color: var(--bf-primary-color); }
-.bf-input:disabled { opacity: 0.6; cursor: not-allowed; background: #f3f4f6; }
+.bf-input:focus {
+    border-color: var(--bf-primary-color);
+}
+
+.bf-input:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    background: #f3f4f6;
+}
 
 .bf-send-btn {
     background: linear-gradient(135deg, var(--bf-primary-color), var(--bf-primary-dark));
@@ -563,19 +523,31 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.2s;
+    transition: transform 0.2s, box-shadow 0.2s;
     flex-shrink: 0;
 }
 
-.bf-send-btn:hover { transform: scale(1.05); }
-.bf-send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.bf-send-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.bf-send-btn:active {
+    transform: scale(0.95);
+}
+
+.bf-send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
 
 .bf-footer {
     padding: 8px;
     text-align: center;
     background: #f9fafb;
-    border-top: 1px solid #e5e7eb;
-    flex-shrink: 0;
+    border-top: 1px solid var(--bf-border-color);
 }
 
 .bf-branding {
@@ -589,20 +561,98 @@
     color: var(--bf-primary-color);
 }
 
-/* THEMES */
-.bf-theme-cloudflare { 
-    --bf-primary-color: #f38020; 
-    --bf-primary-dark: #d96b0f; 
+.bf-human-check {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(10px);
+    z-index: 20;
 }
 
-.bf-theme-intercom { 
-    --bf-primary-color: #1f8ded; 
-    --bf-primary-dark: #1273c5; 
+.bf-human-check-card {
+    width: 100%;
+    max-width: 360px;
+    border-radius: 14px;
+    border: 1px solid var(--bf-border-color);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
+    padding: 18px;
 }
 
-.bf-theme-gradient { 
-    --bf-primary-color: #667eea; 
-    --bf-primary-dark: #764ba2; 
+.bf-human-check-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--bf-text-color);
+}
+
+.bf-human-check-subtitle {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--bf-text-secondary);
+    line-height: 1.4;
+}
+
+.bf-human-check-widget {
+    margin-top: 14px;
+    display: flex;
+    justify-content: center;
+}
+
+.bf-human-check-status {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--bf-text-secondary);
+}
+
+.bf-human-check-error {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #b91c1c;
+}
+
+@media (max-width: 480px) {
+    .bf-chat-window {
+        width: calc(100vw - 40px);
+        height: calc(100vh - 120px);
+    }
+}
+
+/* PROFESSIONAL THEMES */
+
+.bf-theme-cloudflare {
+    --bf-primary-color: #f38020;
+    --bf-primary-dark: #d96b0f;
+}
+
+.bf-theme-cloudflare .bf-header {
+    background: linear-gradient(135deg, #f38020 0%, #f6821f 100%);
+}
+
+.bf-theme-intercom {
+    --bf-primary-color: #1f8ded;
+    --bf-primary-dark: #1273c5;
+    --bf-radius: 12px;
+}
+
+.bf-theme-intercom .bf-header {
+    background: #1f8ded;
+}
+
+.bf-theme-intercom .bf-header::before {
+    display: none;
+}
+
+.bf-theme-gradient {
+    --bf-primary-color: #667eea;
+    --bf-primary-dark: #764ba2;
+}
+
+.bf-theme-gradient .bf-chat-window {
+    background: linear-gradient(180deg, #ffffff 0%, #f8f9ff 100%);
 }
 
 .bf-theme-glassmorphism .bf-chat-window {
@@ -610,434 +660,149 @@
     backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.3);
 }
-.bf-theme-glassmorphism .bf-user-message .bf-message-text {
-    backdrop-filter: blur(10px);
+
+.bf-theme-dark {
+    --bf-bg-color: #1f2937;
+    --bf-text-color: #f9fafb;
+    --bf-text-secondary: #9ca3af;
+    --bf-border-color: #374151;
 }
 
-.bf-theme-dark { 
-    --bf-primary-color: #6366f1; 
-    --bf-primary-dark: #4f46e5;
-    --bf-custom-user-msg-text: #e0e7ff;
+.bf-theme-dark .bf-messages {
+    background: linear-gradient(180deg, #111827 0%, #1f2937 100%);
 }
-.bf-theme-dark .bf-chat-window { background: #1f2937; }
-.bf-theme-dark .bf-messages { background: #111827; }
-.bf-theme-dark .bf-bot-message .bf-message-text { 
-    background: #374151 !important; 
-    color: #f9fafb !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
-}
-.bf-theme-dark .bf-user-message .bf-message-text {
-    background: rgba(99, 102, 241, 0.25) !important;
-}
-.bf-theme-dark .bf-input { 
-    background: #374151; 
-    color: #f9fafb; 
-    border-color: #4b5563; 
-}
-.bf-theme-dark .bf-input::placeholder {
-    color: #9ca3af;
-}
-.bf-theme-dark .bf-input-container { 
-    background: #1f2937; 
-    border-top-color: #374151; 
-}
-.bf-theme-dark .bf-footer { 
-    background: #1f2937; 
-    border-top-color: #374151; 
-}
-.bf-theme-dark .bf-branding { color: #9ca3af; }
-.bf-theme-dark .bf-message-time { color: #9ca3af; }
-.bf-theme-dark .bf-message-text table thead th {
-    background: #4b5563;
+
+.bf-theme-dark .bf-message-text {
+    background: #374151;
     color: #f9fafb;
 }
-.bf-theme-dark .bf-message-text table tbody tr:nth-child(odd) {
+
+.bf-theme-dark .bf-user-message .bf-message-text {
+    background: linear-gradient(135deg, var(--bf-primary-color), var(--bf-primary-dark));
+    color: white !important;
+}
+
+.bf-theme-dark .bf-input {
     background: #374151;
-}
-.bf-theme-dark .bf-message-text table tbody tr:nth-child(even) {
-    background: #4b5563;
-}
-.bf-theme-dark .bf-message-text table th,
-.bf-theme-dark .bf-message-text table td {
+    color: #f9fafb;
     border-color: #4b5563;
 }
 
-.bf-theme-minimal { 
-    --bf-primary-color: #000000; 
+.bf-theme-dark .bf-input:disabled {
+    background: #374151;
+}
+
+.bf-theme-dark .bf-bot-message .bf-message-text code {
+    background: #4b5563;
+    color: #fbbf24;
+}
+
+.bf-theme-dark .bf-human-check {
+    background: rgba(17, 24, 39, 0.9);
+}
+
+.bf-theme-dark .bf-human-check-card {
+    background: rgba(31, 41, 55, 0.95);
+    border-color: #374151;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.bf-theme-minimal {
+    --bf-primary-color: #000000;
     --bf-primary-dark: #1f2937;
-    --bf-custom-user-msg-bg: rgba(0, 0, 0, 0.06);
+    --bf-radius: 8px;
 }
 
-/* CUSTOM THEME */
-.bf-theme-custom .bf-header {
-    background: linear-gradient(135deg, var(--bf-primary-color), var(--bf-primary-dark)) !important;
+.bf-theme-minimal .bf-header {
+    background: #000000;
 }
 
-.bf-theme-custom .bf-chat-button {
-    background: linear-gradient(135deg, var(--bf-primary-color), var(--bf-primary-dark)) !important;
+.bf-theme-minimal .bf-header::before {
+    display: none;
 }
+`;
 
-.bf-theme-custom .bf-send-btn {
-    background: linear-gradient(135deg, var(--bf-primary-color), var(--bf-primary-dark)) !important;
-}
 
-.bf-theme-custom .bf-chat-window {
-    background: var(--bf-custom-chat-bg) !important;
-}
+/**
+ * Beautiful Flowise Chat Widget
+ * Source version with captcha + short-lived token support
+ */
 
-.bf-theme-custom .bf-messages {
-    background: var(--bf-custom-chat-bg) !important;
-}
+(function() {
+    'use strict';
 
-.bf-theme-custom .bf-input-container {
-    background: var(--bf-custom-chat-bg) !important;
-}
+    const TURNSTILE_CDN = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 
-.bf-theme-custom .bf-footer {
-    background: var(--bf-custom-chat-bg) !important;
-}
-
-.bf-theme-custom .bf-loading-dots span {
-    background: var(--bf-primary-color) !important;
-}
-
-.bf-theme-custom .bf-streaming .bf-cursor {
-    background: var(--bf-primary-color) !important;
-}
-
-.bf-theme-custom .bf-input:focus {
-    border-color: var(--bf-primary-color) !important;
-}
-
-.bf-theme-custom .bf-branding:hover {
-    color: var(--bf-primary-color) !important;
-}
-
-.bf-theme-custom .bf-message-text a {
-    color: var(--bf-primary-color) !important;
-}
-    `;
+    const defaults = {
+        theme: 'modern',
+        primaryColor: '#6366f1',
+        position: 'bottom-right',
+        width: '400px',
+        height: '600px',
+        title: 'AI Assistant',
+        subtitle: 'Online',
+        welcomeMessage: 'Hi! How can I help you today?',
+        placeholder: 'Type your message...',
+        sendButtonText: '>',
+        showTimestamp: true,
+        enableStreaming: true,
+        enableMarkdown: true,
+        debug: false,
+        enableSoundNotification: false,
+        avatar: 'AI',
+        requestTimeout: 30000,
+        captcha: null
+    };
 
     class BeautifulFlowiseChat {
         constructor(config) {
             this.config = { ...defaults, ...config };
             this.chatflowid = config.chatflowid;
             this.apiHost = config.apiHost;
-            
-            this.storageKey = `${this.chatflowid}_INTERNAL`;
-            
-            this.isOpen = this.config.mode === 'fullscreen';
-            this.currentStreamingMessageId = null;
-            this.messages = [];
-            this.chatId = null;
-            
-            this.lastScrollTime = 0;
-            this.scrollPending = false;
-            this.scrollAnimationFrame = null;
-            
-            this.streamBuffer = '';
-            this.streamLastUpdate = '';
-            this.streamUpdateTimer = null;
-            this.streamCharCount = 0;
-            this.firstTokenReceived = false;
-            
-            // Simplified: no aggressive caching
-            this.lastFormattedLength = 0;
-            
-            this.abortController = null;
-            this.isSending = false;
-            this.lastRequestTime = 0;
-            
-            this.eventListeners = [];
-            
-            // Will be populated after libraries load
-            this.marked = null;
-            this.DOMPurify = null;
-            
+            this.conversationHistory = [];
+            this.isOpen = false;
+            this.isTyping = false;
+            this.currentStreamingMessage = null;
+            this.proxyAuthToken = null;
+            this.proxyAuthInFlight = null;
+            this.turnstileWidgetId = null;
+            this.turnstileTokenPromise = null;
+            this.turnstileTokenResolve = null;
+            this.turnstileTokenReject = null;
+
             this.init();
         }
 
-        async init() {
-            const existing = document.getElementById('beautiful-flowise-container');
-            if (existing) {
-                this.log('Removing existing widget instance');
-                existing.remove();
-            }
-            
-            // Load markdown libraries
-            try {
-                await Promise.all([
-                    loadLibrary(MARKED_CDN, 'marked'),
-                    loadLibrary(DOMPURIFY_CDN, 'DOMPurify')
-                ]);
-                this.marked = window.marked;
-                this.DOMPurify = window.DOMPurify;
-                
-                // Configure marked for GFM
-                if (this.marked && this.marked.setOptions) {
-                    this.marked.setOptions({
-                        breaks: true,
-                        gfm: true,
-                        headerIds: false,
-                        mangle: false
-                    });
-                }
-                
-                this.log('Markdown libraries loaded successfully');
-            } catch (error) {
-                this.log('Warning: Failed to load markdown libraries, falling back to basic formatting');
-            }
-            
+        init() {
             this.injectStyles();
             this.createWidget();
-            this.applyCustomThemeColors();
             this.attachEventListeners();
-            this.loadFromStorage();
-            
-            this.log('Chat ID:', this.chatId || 'Not yet assigned');
-            this.log('Mode:', this.config.mode);
-            this.log('Messages loaded:', this.messages.length);
-        }
-
-        applyCustomThemeColors() {
-            const container = document.getElementById('beautiful-flowise-container');
-            if (!container) return;
-            
-            container.style.setProperty('--bf-primary-color', this.config.primaryColor);
-            
-            const primaryDark = this.config.primaryDarkColor || this.darkenColor(this.config.primaryColor);
-            container.style.setProperty('--bf-primary-dark', primaryDark);
-            
-            if (this.config.theme === 'custom') {
-                if (this.config.customUserMessageBg) {
-                    container.style.setProperty('--bf-custom-user-msg-bg', this.config.customUserMessageBg);
-                } else {
-                    const rgba = this.colorToRgba(this.config.primaryColor, 0.15);
-                    container.style.setProperty('--bf-custom-user-msg-bg', rgba);
-                }
-                
-                if (this.config.customUserMessageText) {
-                    container.style.setProperty('--bf-custom-user-msg-text', this.config.customUserMessageText);
-                }
-                
-                if (this.config.customChatBg) {
-                    container.style.setProperty('--bf-custom-chat-bg', this.config.customChatBg);
-                }
-            }
-        }
-
-        darkenColor(color) {
-            if (!color) return '#4f46e5';
-            
-            if (color.startsWith('#')) {
-                return this.darkenHex(color);
-            }
-            
-            const rgbMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-            if (rgbMatch) {
-                const [, r, g, b, a] = rgbMatch;
-                const darkR = Math.max(0, Math.floor(parseInt(r) * 0.8));
-                const darkG = Math.max(0, Math.floor(parseInt(g) * 0.8));
-                const darkB = Math.max(0, Math.floor(parseInt(b) * 0.8));
-                return a !== undefined ? `rgba(${darkR}, ${darkG}, ${darkB}, ${a})` : `rgb(${darkR}, ${darkG}, ${darkB})`;
-            }
-            
-            return '#4f46e5';
-        }
-
-        darkenHex(hex) {
-            hex = hex.replace('#', '');
-            
-            if (hex.length === 3) {
-                hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
-            }
-            
-            if (hex.length !== 6) return '#4f46e5';
-            
-            const r = Math.max(0, Math.floor(parseInt(hex.substring(0, 2), 16) * 0.8));
-            const g = Math.max(0, Math.floor(parseInt(hex.substring(2, 4), 16) * 0.8));
-            const b = Math.max(0, Math.floor(parseInt(hex.substring(4, 6), 16) * 0.8));
-            
-            return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-        }
-
-        colorToRgba(color, alpha) {
-            if (!color) return `rgba(99, 102, 241, ${alpha})`;
-            
-            const rgbMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-            if (rgbMatch) {
-                const [, r, g, b] = rgbMatch;
-                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-            }
-            
-            if (color.startsWith('#')) {
-                let hex = color.replace('#', '');
-                
-                if (hex.length === 3) {
-                    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
-                }
-                
-                if (hex.length === 6) {
-                    const r = parseInt(hex.substring(0, 2), 16);
-                    const g = parseInt(hex.substring(2, 4), 16);
-                    const b = parseInt(hex.substring(4, 6), 16);
-                    
-                    if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
-                        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-                    }
-                }
-            }
-            
-            return `rgba(99, 102, 241, ${alpha})`;
+            this.initializeHumanCheck();
         }
 
         log(...args) {
-            if (this.config.debug) console.log('[BeautifulFlowise]', ...args);
-        }
-
-        loadFromStorage() {
-            if (this.config.clearChatOnReload) {
-                this.messages = [];
-                this.chatId = null;
-                this.initializeWithWelcome();
-                return;
-            }
-
-            try {
-                const stored = localStorage.getItem(this.storageKey);
-                if (stored) {
-                    const data = JSON.parse(stored);
-                    
-                    if (typeof data !== 'object' || data === null) {
-                        throw new Error('Invalid data structure');
-                    }
-                    
-                    if (data.chatId) {
-                        if (/^[a-f0-9-]{36}$/i.test(data.chatId)) {
-                            this.chatId = data.chatId;
-                            this.log('Loaded chatId from storage:', this.chatId);
-                        } else {
-                            this.log('Invalid chatId format, clearing');
-                            data.chatId = null;
-                        }
-                    }
-                    
-                    if (data.messages && Array.isArray(data.messages)) {
-                        if (data.messages.length > this.config.maxMessages) {
-                            this.log(`Trimming message history from ${data.messages.length} to ${this.config.maxMessages}`);
-                            data.messages = data.messages.slice(-this.config.maxMessages);
-                        }
-                        
-                        if (data.messages.length > 0) {
-                            this.messages = data.messages;
-                            this.restoreMessages();
-                        } else {
-                            this.initializeWithWelcome();
-                        }
-                    } else {
-                        this.initializeWithWelcome();
-                    }
-                } else {
-                    this.initializeWithWelcome();
-                }
-            } catch (e) {
-                this.log('Error loading from storage:', e);
-                localStorage.removeItem(this.storageKey);
-                this.initializeWithWelcome();
-            }
-        }
-
-        initializeWithWelcome() {
-            this.messages = [];
-            if (this.config.welcomeMessage) {
-                this.messages.push({ role: 'bot', content: this.config.welcomeMessage });
-                this.addMessageToUI(this.config.welcomeMessage, 'bot');
-                this.saveToStorage();
-            }
-        }
-
-        saveToStorage() {
-            if (this.config.clearChatOnReload) return;
-            
-            try {
-                let messagesToSave = this.messages;
-                if (messagesToSave.length > this.config.maxMessages) {
-                    messagesToSave = messagesToSave.slice(-this.config.maxMessages);
-                    this.messages = messagesToSave;
-                }
-                
-                const data = {
-                    chatId: this.chatId,
-                    messages: messagesToSave
-                };
-                localStorage.setItem(this.storageKey, JSON.stringify(data));
-                this.log('Saved to storage - chatId:', this.chatId, 'messages:', messagesToSave.length);
-            } catch (e) {
-                this.log('Error saving to storage:', e);
-            }
-        }
-
-        restoreMessages() {
-            const messagesContainer = document.getElementById('bf-messages');
-            messagesContainer.innerHTML = '';
-            
-            this.messages.forEach(msg => {
-                this.addMessageToUI(msg.content, msg.role);
-            });
-            
-            this.scrollToBottom();
-            this.log('Restored', this.messages.length, 'messages');
-        }
-
-        resetConversation() {
-            const shouldReset = this.config.confirmOnReset 
-                ? confirm('Are you sure you want to clear the chat history?')
-                : true;
-            
-            if (shouldReset) {
-                if (this.abortController) {
-                    this.abortController.abort();
-                    this.abortController = null;
-                }
-                
-                localStorage.removeItem(this.storageKey);
-                
-                this.chatId = null;
-                this.messages = [];
-                this.isSending = false;
-                this.currentStreamingMessageId = null;
-                
-                const messagesContainer = document.getElementById('bf-messages');
-                messagesContainer.innerHTML = '';
-                
-                const input = document.getElementById('bf-input');
-                const sendBtn = document.getElementById('bf-send');
-                if (input) input.disabled = false;
-                if (sendBtn) sendBtn.disabled = false;
-                
-                this.initializeWithWelcome();
-                
-                this.log('Chat reset');
+            if (this.config.debug) {
+                console.log('[BeautifulFlowise]', ...args);
             }
         }
 
         injectStyles() {
             if (document.getElementById('beautiful-flowise-styles')) return;
+
             const styleSheet = document.createElement('style');
             styleSheet.id = 'beautiful-flowise-styles';
-            styleSheet.textContent = styles;
+            styleSheet.textContent = window.BEAUTIFUL_FLOWISE_STYLES || '';
             document.head.appendChild(styleSheet);
         }
 
         createWidget() {
             const container = document.createElement('div');
             container.id = 'beautiful-flowise-container';
-            container.className = `bf-container bf-mode-${this.config.mode} bf-${this.config.position} bf-theme-${this.config.theme}`;
-            
-            const chatWindowDisplay = this.config.mode === 'fullscreen' ? 'flex' : 'none';
-            
+            container.className = `bf-container bf-${this.config.position} bf-theme-${this.config.theme}`;
+            container.style.setProperty('--bf-primary-color', this.config.primaryColor);
+
             container.innerHTML = `
-                <button class="bf-chat-button" id="bf-toggle-button">
+                <button class="bf-chat-button" id="bf-toggle-button" aria-label="Open chat">
                     <svg class="bf-button-icon bf-button-open" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                     </svg>
@@ -1046,7 +811,8 @@
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
                 </button>
-                <div class="bf-chat-window" id="bf-chat-window" style="display: ${chatWindowDisplay};">
+
+                <div class="bf-chat-window" id="bf-chat-window" style="display: none;">
                     <div class="bf-header">
                         <div class="bf-header-content">
                             <div class="bf-avatar">${this.config.avatar}</div>
@@ -1056,96 +822,144 @@
                             </div>
                         </div>
                         <div class="bf-header-actions">
-                            <button class="bf-reset-btn" id="bf-reset" title="Reset Chat">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="1 4 1 10 7 10"></polyline>
-                                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                            <button class="bf-header-btn" id="bf-new-chat" aria-label="New conversation" title="New conversation">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M3 6h18"></path>
+                                    <path d="M8 6V4h8v2"></path>
+                                    <path d="M6 6l1 16h10l1-16"></path>
                                 </svg>
                             </button>
-                            <button class="bf-minimize-btn" id="bf-minimize">−</button>
+                            <button class="bf-minimize-btn" id="bf-minimize" aria-label="Minimize chat">-</button>
                         </div>
                     </div>
-                    <div class="bf-messages" id="bf-messages"></div>
-                    <div class="bf-input-container">
-                        <textarea class="bf-input" id="bf-input" placeholder="${this.config.placeholder}" rows="1"></textarea>
-                        <button class="bf-send-btn" id="bf-send">${this.config.sendButtonText}</button>
+
+                    <div class="bf-messages" id="bf-messages">
+                        ${this.config.welcomeMessage ? `
+                        <div class="bf-message bf-bot-message">
+                            <div class="bf-message-avatar">${this.config.avatar}</div>
+                            <div class="bf-message-content">
+                                <div class="bf-message-text">${this.formatMessage(this.config.welcomeMessage)}</div>
+                                ${this.config.showTimestamp ? `<div class="bf-message-time">${this.getTimeString()}</div>` : ''}
+                            </div>
+                        </div>` : ''}
                     </div>
+
+                    <div class="bf-human-check" id="bf-human-check">
+                        <div class="bf-human-check-card">
+                            <div class="bf-human-check-title">Verify you are human</div>
+                            <div class="bf-human-check-subtitle">Complete the challenge to start chatting.</div>
+                            <div class="bf-human-check-widget" id="bf-human-check-widget"></div>
+                            <div class="bf-human-check-status" id="bf-human-check-status" style="display:none;"></div>
+                            <div class="bf-human-check-error" id="bf-human-check-error" style="display:none;"></div>
+                        </div>
+                    </div>
+
+                    <div class="bf-typing" id="bf-typing" style="display: none;">
+                        <div class="bf-typing-avatar">${this.config.avatar}</div>
+                        <div class="bf-typing-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+
+                    <div class="bf-input-container">
+                        <textarea
+                            class="bf-input"
+                            id="bf-input"
+                            placeholder="${this.config.placeholder}"
+                            rows="1"
+                        ></textarea>
+                        <button class="bf-send-btn" id="bf-send" aria-label="Send message">
+                            ${this.config.sendButtonText}
+                        </button>
+                    </div>
+
                     <div class="bf-footer">
-                        <a href="mailto:mail.rps.active@proton.me" class="bf-branding">Powered by RPS</a>
+                        <a href="mailto:mail.rps.active@proton.me" class="bf-branding">
+                            mail.rps.active@proton.me
+                        </a>
                     </div>
                 </div>
             `;
+
             document.body.appendChild(container);
         }
 
         attachEventListeners() {
-            const addListener = (element, event, handler) => {
-                if (element) {
-                    element.addEventListener(event, handler);
-                    this.eventListeners.push({ element, event, handler });
-                }
-            };
-            
-            addListener(document.getElementById('bf-toggle-button'), 'click', () => this.toggleChat());
-            
+            const toggleBtn = document.getElementById('bf-toggle-button');
             const minimizeBtn = document.getElementById('bf-minimize');
-            if (minimizeBtn && this.config.mode === 'popup') {
-                addListener(minimizeBtn, 'click', () => this.toggleChat());
-            }
-            
-            addListener(document.getElementById('bf-reset'), 'click', () => this.resetConversation());
-            addListener(document.getElementById('bf-send'), 'click', () => this.sendMessage());
-            
+            const newChatBtn = document.getElementById('bf-new-chat');
+            const sendBtn = document.getElementById('bf-send');
             const input = document.getElementById('bf-input');
-            const inputKeyHandler = (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
+
+            toggleBtn.addEventListener('click', () => this.toggleChat());
+            minimizeBtn.addEventListener('click', () => this.toggleChat());
+            if (newChatBtn) {
+                newChatBtn.addEventListener('click', () => this.startNewConversation());
+            }
+            sendBtn.addEventListener('click', () => this.sendMessage());
+
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
                     this.sendMessage();
                 }
-            };
-            addListener(input, 'keydown', inputKeyHandler);
-            
-            const inputResizeHandler = () => {
+            });
+
+            input.addEventListener('input', () => {
                 input.style.height = 'auto';
-                input.style.height = Math.min(input.scrollHeight, CONSTANTS.MAX_INPUT_HEIGHT) + 'px';
-            };
-            addListener(input, 'input', inputResizeHandler);
-            
-            if (this.config.mode === 'fullscreen') {
-                setTimeout(() => input.focus(), CONSTANTS.FOCUS_DELAY);
-            }
+                input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+            });
         }
 
-        removeEventListeners() {
-            this.eventListeners.forEach(({ element, event, handler }) => {
-                if (element) {
-                    element.removeEventListener(event, handler);
-                }
-            });
-            this.eventListeners = [];
+        getWelcomeMarkup() {
+            if (!this.config.welcomeMessage) return '';
+            return `
+                <div class="bf-message bf-bot-message">
+                    <div class="bf-message-avatar">${this.config.avatar}</div>
+                    <div class="bf-message-content">
+                        <div class="bf-message-text">${this.formatMessage(this.config.welcomeMessage)}</div>
+                        ${this.config.showTimestamp ? `<div class="bf-message-time">${this.getTimeString()}</div>` : ''}
+                    </div>
+                </div>`;
+        }
+
+        startNewConversation() {
+            this.conversationHistory = [];
+            this.currentStreamingMessage = null;
+            this.showTyping(false);
+
+            const messagesContainer = document.getElementById('bf-messages');
+            if (messagesContainer) {
+                messagesContainer.innerHTML = this.getWelcomeMarkup();
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+
+            const overlay = document.getElementById('bf-human-check');
+            const isOverlayVisible = overlay && overlay.style.display !== 'none';
+            if (!isOverlayVisible) {
+                const input = document.getElementById('bf-input');
+                const sendBtn = document.getElementById('bf-send');
+                if (input) input.disabled = false;
+                if (sendBtn) sendBtn.disabled = false;
+            }
         }
 
         toggleChat() {
-            if (this.config.mode === 'fullscreen') return;
-            
             this.isOpen = !this.isOpen;
             const chatWindow = document.getElementById('bf-chat-window');
             const openIcon = document.querySelector('.bf-button-open');
             const closeIcon = document.querySelector('.bf-button-close');
+
             if (this.isOpen) {
                 chatWindow.style.display = 'flex';
                 openIcon.style.display = 'none';
                 closeIcon.style.display = 'block';
                 document.getElementById('bf-input').focus();
+                this.maybeShowHumanCheck();
             } else {
                 chatWindow.style.display = 'none';
                 openIcon.style.display = 'block';
                 closeIcon.style.display = 'none';
-                
-                if (this.abortController) {
-                    this.abortController.abort();
-                    this.abortController = null;
-                }
             }
         }
 
@@ -1153,497 +967,476 @@
             const input = document.getElementById('bf-input');
             const sendBtn = document.getElementById('bf-send');
             const message = input.value.trim();
-            
+
             if (!message) return;
-            if (this.isSending) {
-                this.log('Already sending a message');
-                return;
-            }
-            
-            const now = Date.now();
-            if (now - this.lastRequestTime < CONSTANTS.MIN_REQUEST_INTERVAL) {
-                this.log('Rate limited');
-                return;
-            }
-            this.lastRequestTime = now;
-            
-            this.isSending = true;
+
             input.disabled = true;
             sendBtn.disabled = true;
 
-            this.addMessage(message, 'user');
-            
-            input.value = '';
-            input.style.height = 'auto';
-
-            const botMessageId = this.createPlaceholderMessage();
-            this.currentStreamingMessageId = botMessageId;
-            this.firstTokenReceived = false;
-            
-            // Reset tracking
-            this.lastFormattedLength = 0;
-            
-            this.abortController = new AbortController();
-
             try {
-                if (this.config.enableStreaming) {
-                    await this.sendWithStreaming(message, botMessageId);
-                } else {
-                    await this.sendWithoutStreaming(message, botMessageId);
-                }
+                await this.ensureProxyAuth({ restoreUi: false });
+
+                this.addMessage(message, 'user');
+                input.value = '';
+                input.style.height = 'auto';
+                this.showTyping(true);
+
+                await this.sendMessageWithoutStreaming(message, false);
             } catch (error) {
-                if (error.name === 'AbortError') {
-                    this.log('Request aborted');
-                } else {
-                    this.log('Error:', error);
-                    const elem = document.getElementById(botMessageId);
-                    if (elem) elem.remove();
-                    this.addMessage(
-                        "I'm having trouble connecting. Please try again. 🔄",
-                        'bot'
-                    );
-                }
+                console.error('Flowise API Error:', error);
+                this.showTyping(false);
+                this.addMessage('Sorry, something went wrong. Please try again.', 'bot', true);
             } finally {
-                this.currentStreamingMessageId = null;
-                this.abortController = null;
-                this.isSending = false;
-                input.disabled = false;
-                sendBtn.disabled = false;
+                const overlay = document.getElementById('bf-human-check');
+                const isOverlayVisible = overlay && overlay.style.display !== 'none';
+                if (!isOverlayVisible) {
+                    input.disabled = false;
+                    sendBtn.disabled = false;
+                }
             }
         }
 
-        async fetchWithTimeout(url, options) {
-            const controller = this.abortController;
-            const timeout = setTimeout(() => {
-                if (controller) controller.abort();
+        async sendMessageWithoutStreaming(message, retriedAfter401) {
+            this.log('Sending message:', message);
+            this.log('API Host:', this.apiHost);
+            this.log('Chatflow ID:', this.chatflowid);
+
+            const response = await this.fetchWithTimeout(`${this.apiHost}/api/v1/prediction/${this.chatflowid}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...this.getProxyAuthHeaders()
+                },
+                body: JSON.stringify({
+                    question: message,
+                    history: this.conversationHistory
+                })
             }, this.config.requestTimeout);
 
+            this.log('Response status:', response.status);
+
+            if (response.status === 401 && this.isCaptchaEnabled() && this.proxyAuthToken && !retriedAfter401) {
+                this.proxyAuthToken = null;
+                this.resetTurnstile();
+                await this.ensureProxyAuth({ restoreUi: false });
+                return this.sendMessageWithoutStreaming(message, true);
+            }
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                this.log('Error response:', errorText);
+                throw new Error(`API request failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+            this.log('Response data:', data);
+
+            this.showTyping(false);
+
+            const botMessage = data.text || data.answer || data.response || data.output ||
+                             (data.data && data.data.text) ||
+                             JSON.stringify(data);
+
+            this.log('Bot message extracted:', botMessage);
+            this.addMessage(botMessage, 'bot');
+            this.conversationHistory.push([message, botMessage]);
+        }
+
+        async fetchWithTimeout(url, options, timeoutMs) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), timeoutMs || 30000);
+
             try {
-                const response = await fetch(url, {
+                return await fetch(url, {
                     ...options,
-                    signal: controller ? controller.signal : undefined
+                    signal: controller.signal
                 });
+            } finally {
                 clearTimeout(timeout);
-                return response;
-            } catch (error) {
-                clearTimeout(timeout);
-                if (error.name === 'AbortError') {
-                    throw new Error('Request timeout or aborted');
-                }
-                throw error;
             }
         }
 
-        async sendWithStreaming(message, botMessageId) {
+        getHumanCheckErrorMessage(error) {
+            if (error && typeof error.message === 'string' && error.message.trim()) {
+                return error.message.trim();
+            }
+            return 'Verification failed. Please try again.';
+        }
+
+        shouldAutoResetTurnstile(error) {
+            const reason = error && typeof error.reason === 'string'
+                ? error.reason.trim().toLowerCase()
+                : '';
+
+            // Configuration errors will not be fixed by retrying the captcha challenge.
+            if (reason === 'invalid-hostname') {
+                return false;
+            }
+            return true;
+        }
+
+        async createTokenEndpointError(response) {
+            let message = '';
+            let reason = '';
+
             try {
-                const body = { 
-                    question: message, 
-                    streaming: true
-                };
-                
-                if (this.chatId) {
-                    body.chatId = this.chatId;
-                }
-                
-                const response = await this.fetchWithTimeout(
-                    `${this.apiHost}/api/v1/prediction/${this.chatflowid}`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(body)
-                    }
-                );
-
-                if (!response.ok) throw new Error('API failed');
-                
-                const contentType = response.headers.get('content-type');
-                if (!contentType?.includes('text/event-stream')) {
-                    const data = await response.json();
-                    if (data.chatId && data.chatId !== this.chatId) {
-                        this.chatId = data.chatId;
-                        this.saveToStorage();
-                        this.log('ChatId assigned:', this.chatId);
-                    }
-                    const botMessage = data.text || data.answer || data.response || 'No response';
-                    this.updatePlaceholderMessage(botMessageId, botMessage, false);
-                    this.addMessageToStorage(botMessage, 'bot');
-                    return;
-                }
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
-                
-                this.streamBuffer = '';
-                this.streamLastUpdate = '';
-                this.streamCharCount = 0;
-                this.firstTokenReceived = false;
-                
-                const scheduleUpdate = () => {
-                    if (this.streamUpdateTimer) return;
-                    
-                    this.streamUpdateTimer = setTimeout(() => {
-                        const charDiff = this.streamBuffer.length - this.streamLastUpdate.length;
-                        
-                        // Update DURING streaming - EVERY TIME (no caching)
-                        if (charDiff >= CONSTANTS.STREAM_MIN_CHARS || !this.firstTokenReceived) {
-                            this.updatePlaceholderMessage(botMessageId, this.streamBuffer, true);
-                            this.streamLastUpdate = this.streamBuffer;
-                            this.firstTokenReceived = true;
-                        }
-                        
-                        this.streamUpdateTimer = null;
-                    }, CONSTANTS.STREAM_UPDATE_INTERVAL);
-                };
-                
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-
-                    buffer += decoder.decode(value, { stream: true });
-                    
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop() || '';
-                    
-                    for (const line of lines) {
-                        const trimmed = line.trim();
-                        if (!trimmed || trimmed.startsWith(':') || !trimmed.startsWith('data:')) continue;
-
-                        const payload = trimmed.slice(5).trim();
-                        if (payload === '[DONE]' || payload === '"[DONE]"') continue;
-
-                        let token = '';
-                        let metadata = null;
-                        
-                        try {
-                            const obj = JSON.parse(payload);
-                            if (obj && typeof obj === 'object') {
-                                if (obj.event === 'token' && obj.data) {
-                                    token = obj.data;
-                                } else if (obj.event === 'metadata' && obj.data) {
-                                    metadata = obj.data;
-                                } else if (typeof obj === 'string') {
-                                    token = obj;
-                                }
+                const bodyText = await response.text();
+                if (bodyText) {
+                    try {
+                        const payload = JSON.parse(bodyText);
+                        if (payload && typeof payload === 'object') {
+                            if (typeof payload.message === 'string') {
+                                message = payload.message.trim();
+                            } else if (typeof payload.error === 'string') {
+                                message = payload.error.trim();
                             }
-                        } catch {
-                            if (payload.startsWith('"') && payload.endsWith('"')) {
-                                try {
-                                    token = JSON.parse(payload);
-                                } catch {
-                                    token = payload.slice(1, -1);
-                                }
-                            } else {
-                                token = payload;
+                            if (typeof payload.reason === 'string') {
+                                reason = payload.reason.trim().toLowerCase();
                             }
                         }
-
-                        if (metadata && metadata.chatId && metadata.chatId !== this.chatId) {
-                            this.chatId = metadata.chatId;
-                            this.saveToStorage();
-                            this.log('ChatId assigned:', this.chatId);
-                        }
-
-                        if (token) {
-                            this.streamBuffer += token;
-                            this.streamCharCount++;
-                            scheduleUpdate();
-                        }
+                    } catch {
+                        message = bodyText.trim();
                     }
                 }
+            } catch {
+                // ignore read/parsing failures
+            }
 
-                if (this.streamUpdateTimer) {
-                    clearTimeout(this.streamUpdateTimer);
-                    this.streamUpdateTimer = null;
-                }
-                
-                if (this.streamBuffer) {
-                    // Final update
-                    this.updatePlaceholderMessage(botMessageId, this.streamBuffer, false);
-                    this.addMessageToStorage(this.streamBuffer, 'bot');
-                    this.streamBuffer = '';
-                } else {
-                    throw new Error('No text streamed');
-                }
+            const error = new Error(message || `Token endpoint failed: ${response.status}`);
+            error.status = response.status;
+            if (reason) {
+                error.reason = reason;
+            }
+            return error;
+        }
 
-            } catch (error) {
-                if (error.name === 'AbortError' || error.message.includes('aborted')) {
-                    throw error;
-                }
-                this.log('Streaming failed:', error);
-                await this.sendWithoutStreaming(message, botMessageId);
+        isCaptchaEnabled() {
+            return !!(
+                this.config.captcha &&
+                typeof this.config.captcha === 'object' &&
+                (this.config.captcha.provider || 'turnstile').toLowerCase() === 'turnstile' &&
+                typeof this.config.captcha.siteKey === 'string' &&
+                this.config.captcha.siteKey.trim().length > 0
+            );
+        }
+
+        getTokenEndpointUrl() {
+            const endpoint = (this.config.captcha && this.config.captcha.tokenEndpoint) ? String(this.config.captcha.tokenEndpoint) : '/auth/chat-token';
+            if (/^https?:\/\//i.test(endpoint)) return endpoint;
+            const normalized = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+            return `${this.apiHost}${normalized}`;
+        }
+
+        getProxyAuthHeaders() {
+            if (!this.proxyAuthToken) return {};
+            const headerName = (this.config.captcha && this.config.captcha.authHeaderName)
+                ? String(this.config.captcha.authHeaderName)
+                : 'Authorization';
+            return { [headerName]: `Bearer ${this.proxyAuthToken}` };
+        }
+
+        setHumanCheckVisible(visible) {
+            const overlay = document.getElementById('bf-human-check');
+            if (!overlay) return;
+            overlay.style.display = visible ? 'flex' : 'none';
+        }
+
+        setHumanCheckStatus(message) {
+            const element = document.getElementById('bf-human-check-status');
+            if (!element) return;
+            const text = typeof message === 'string' ? message.trim() : '';
+            if (!text) {
+                element.style.display = 'none';
+                element.textContent = '';
+                return;
+            }
+            element.style.display = 'block';
+            element.textContent = text;
+        }
+
+        setHumanCheckError(message) {
+            const element = document.getElementById('bf-human-check-error');
+            if (!element) return;
+            const text = typeof message === 'string' ? message.trim() : '';
+            if (!text) {
+                element.style.display = 'none';
+                element.textContent = '';
+                return;
+            }
+            element.style.display = 'block';
+            element.textContent = text;
+        }
+
+        initializeHumanCheck() {
+            if (!this.isCaptchaEnabled()) {
+                this.setHumanCheckVisible(false);
+                return;
+            }
+            this.setHumanCheckVisible(false);
+            this.setHumanCheckStatus('');
+            this.setHumanCheckError('');
+        }
+
+        maybeShowHumanCheck() {
+            if (!this.isCaptchaEnabled()) return;
+            if (this.proxyAuthToken) return;
+
+            this.setHumanCheckVisible(true);
+            this.setHumanCheckStatus('');
+            this.setHumanCheckError('');
+
+            const autoStart = !(this.config.captcha && this.config.captcha.autoStart === false);
+            if (autoStart) {
+                this.ensureProxyAuth({ restoreUi: true }).catch((error) => {
+                    this.log('Captcha flow failed:', error);
+                    this.setHumanCheckError(this.getHumanCheckErrorMessage(error));
+                });
             }
         }
 
-        async sendWithoutStreaming(message, botMessageId) {
-            const body = { question: message };
-            
-            if (this.chatId) {
-                body.chatId = this.chatId;
+        async loadTurnstile() {
+            if (window.turnstile && typeof window.turnstile.render === 'function') {
+                return;
             }
-            
-            const response = await this.fetchWithTimeout(
-                `${this.apiHost}/api/v1/prediction/${this.chatflowid}`,
-                {
+
+            const existingScript = document.getElementById('bf-turnstile-script');
+            if (existingScript) {
+                await new Promise((resolve, reject) => {
+                    existingScript.addEventListener('load', resolve, { once: true });
+                    existingScript.addEventListener('error', reject, { once: true });
+                });
+                return;
+            }
+
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.id = 'bf-turnstile-script';
+                script.src = TURNSTILE_CDN;
+                script.async = true;
+                script.defer = true;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        resetTurnstile() {
+            if (!window.turnstile || this.turnstileWidgetId === null) return;
+            try {
+                window.turnstile.reset(this.turnstileWidgetId);
+            } catch {
+                // ignore reset failures
+            }
+        }
+
+        async renderTurnstileWidget() {
+            if (!this.isCaptchaEnabled()) return;
+
+            const widgetContainer = document.getElementById('bf-human-check-widget');
+            if (!widgetContainer) throw new Error('Captcha container not found');
+
+            await this.loadTurnstile();
+
+            if (!window.turnstile || typeof window.turnstile.render !== 'function') {
+                throw new Error('Turnstile failed to load');
+            }
+
+            if (this.turnstileWidgetId !== null) {
+                this.resetTurnstile();
+                return;
+            }
+
+            widgetContainer.innerHTML = '';
+            this.turnstileWidgetId = window.turnstile.render(widgetContainer, {
+                sitekey: this.config.captcha.siteKey.trim(),
+                theme: this.config.captcha.theme || 'auto',
+                size: this.config.captcha.size || 'normal',
+                callback: (token) => {
+                    if (this.turnstileTokenResolve) {
+                        this.turnstileTokenResolve(token);
+                        this.turnstileTokenResolve = null;
+                        this.turnstileTokenReject = null;
+                        this.turnstileTokenPromise = null;
+                    }
+                },
+                'expired-callback': () => {
+                    this.setHumanCheckError('Captcha expired. Please try again.');
+                    this.resetTurnstile();
+                },
+                'error-callback': () => {
+                    this.setHumanCheckError('Captcha error. Please try again.');
+                    if (this.turnstileTokenReject) {
+                        this.turnstileTokenReject(new Error('Captcha error'));
+                        this.turnstileTokenResolve = null;
+                        this.turnstileTokenReject = null;
+                        this.turnstileTokenPromise = null;
+                    }
+                    this.resetTurnstile();
+                }
+            });
+        }
+
+        async waitForTurnstileToken() {
+            if (this.turnstileTokenPromise) return this.turnstileTokenPromise;
+
+            this.turnstileTokenPromise = new Promise((resolve, reject) => {
+                this.turnstileTokenResolve = resolve;
+                this.turnstileTokenReject = reject;
+            });
+
+            await this.renderTurnstileWidget();
+            return this.turnstileTokenPromise;
+        }
+
+        async ensureProxyAuth(options) {
+            if (!this.isCaptchaEnabled()) return;
+            if (this.proxyAuthToken) return;
+
+            const restoreUi = !(options && options.restoreUi === false);
+
+            if (this.proxyAuthInFlight) {
+                await this.proxyAuthInFlight;
+                return;
+            }
+
+            this.proxyAuthInFlight = (async () => {
+                this.setHumanCheckVisible(true);
+                this.setHumanCheckStatus('');
+                this.setHumanCheckError('');
+
+                const captchaToken = await this.waitForTurnstileToken();
+                this.setHumanCheckStatus('Verifying...');
+
+                const payload = {
+                    provider: 'turnstile',
+                    captchaToken,
+                    chatflowid: this.chatflowid
+                };
+
+                if (this.config.captcha && typeof this.config.captcha.siteId === 'string' && this.config.captcha.siteId.trim()) {
+                    payload.siteId = this.config.captcha.siteId.trim();
+                }
+
+                const response = await this.fetchWithTimeout(this.getTokenEndpointUrl(), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
+                    body: JSON.stringify(payload)
+                }, this.config.requestTimeout);
+
+                if (!response.ok) {
+                    throw await this.createTokenEndpointError(response);
                 }
-            );
 
-            if (!response.ok) throw new Error('API failed');
-            const data = await response.json();
-            
-            if (data.chatId && data.chatId !== this.chatId) {
-                this.chatId = data.chatId;
-                this.saveToStorage();
-                this.log('ChatId assigned:', this.chatId);
+                const data = await response.json();
+                const token = data && (data.token || data.accessToken || data.jwt || data.sessionToken);
+                if (!token || typeof token !== 'string') {
+                    throw new Error('Token endpoint returned invalid token');
+                }
+
+                this.proxyAuthToken = token;
+                this.setHumanCheckVisible(false);
+                this.setHumanCheckStatus('');
+                this.setHumanCheckError('');
+
+                if (restoreUi) {
+                    const input = document.getElementById('bf-input');
+                    const sendBtn = document.getElementById('bf-send');
+                    if (input) input.disabled = false;
+                    if (sendBtn) sendBtn.disabled = false;
+                }
+            })();
+
+            try {
+                await this.proxyAuthInFlight;
+            } catch (error) {
+                this.setHumanCheckStatus('');
+                this.setHumanCheckError(this.getHumanCheckErrorMessage(error));
+                if (this.shouldAutoResetTurnstile(error)) {
+                    this.resetTurnstile();
+                }
+                throw error;
+            } finally {
+                this.proxyAuthInFlight = null;
             }
-            
-            const botMessage = data.text || data.answer || data.response || 'No response';
-            this.updatePlaceholderMessage(botMessageId, botMessage, false);
-            this.addMessageToStorage(botMessage, 'bot');
         }
 
-        addMessageToStorage(content, role) {
-            this.messages.push({ role, content });
-            this.saveToStorage();
-        }
-
-        addMessage(text, sender) {
-            this.addMessageToStorage(text, sender);
-            this.addMessageToUI(text, sender);
-        }
-
-        addMessageToUI(text, sender) {
+        addMessage(text, sender, isError = false) {
             const messagesContainer = document.getElementById('bf-messages');
             const messageDiv = document.createElement('div');
-            messageDiv.className = `bf-message bf-${sender}-message`;
-            
-            const formattedText = sender === 'bot' ? this.formatMarkdown(text) : this.escapeHtml(text);
-            
+            messageDiv.className = `bf-message bf-${sender}-message ${isError ? 'bf-error' : ''}`;
+
+            const formattedText = sender === 'bot' ? this.formatMessage(text) : this.escapeHtml(text);
+
             messageDiv.innerHTML = `
+                ${sender === 'bot' ? `<div class="bf-message-avatar">${this.config.avatar}</div>` : ''}
                 <div class="bf-message-content">
                     <div class="bf-message-text">${formattedText}</div>
                     ${this.config.showTimestamp ? `<div class="bf-message-time">${this.getTimeString()}</div>` : ''}
                 </div>
             `;
-            messagesContainer.appendChild(messageDiv);
-            this.scrollToBottom();
-        }
-
-        createPlaceholderMessage() {
-            const messagesContainer = document.getElementById('bf-messages');
-            const messageId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-            const messageDiv = document.createElement('div');
-            messageDiv.id = messageId;
-            messageDiv.className = 'bf-message bf-bot-message';
-            
-            messageDiv.innerHTML = `
-                <div class="bf-message-content">
-                    <div class="bf-message-text">
-                        <div class="bf-loading-dots">
-                            <span></span>
-                            <span></span>
-                            <span></span>
-                        </div>
-                    </div>
-                    ${this.config.showTimestamp ? `<div class="bf-message-time">${this.getTimeString()}</div>` : ''}
-                </div>
-            `;
 
             messagesContainer.appendChild(messageDiv);
-            this.scrollToBottom();
-            return messageId;
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        updatePlaceholderMessage(messageId, text, isStreaming) {
-            const messageDiv = document.getElementById(messageId);
-            if (!messageDiv) return;
-
-            const textElement = messageDiv.querySelector('.bf-message-text');
-            
-            // TRUE REAL-TIME: Format markdown on EVERY render (with light threshold)
-            if (this.marked && this.DOMPurify && this.config.enableMarkdown) {
-                // Only re-parse if 5+ new characters OR final render
-                const needsReformat = text.length - this.lastFormattedLength >= 5 || !isStreaming;
-                
-                let formattedHtml;
-                if (needsReformat) {
-                    try {
-                        const rawHtml = this.marked.parse(text);
-                        formattedHtml = this.DOMPurify.sanitize(rawHtml);
-                        this.lastFormattedLength = text.length;
-                    } catch (e) {
-                        this.log('Markdown parse error:', e);
-                        formattedHtml = this.escapeHtml(text).replace(/\n/g, '<br>');
-                    }
-                } else {
-                    // Use last formatted version + plain text for new chars
-                    const newChars = text.substring(this.lastFormattedLength);
-                    formattedHtml = textElement.innerHTML.replace(/<span class="bf-cursor"><\/span>/g, '') + this.escapeHtml(newChars).replace(/\n/g, '<br>');
-                }
-                
-                textElement.innerHTML = formattedHtml;
-                
-                if (isStreaming) {
-                    // Add cursor
-                    const cursor = document.createElement('span');
-                    cursor.className = 'bf-cursor';
-                    textElement.appendChild(cursor);
-                    messageDiv.classList.add('bf-streaming');
-                    this.smartScroll();
-                } else {
-                    messageDiv.classList.remove('bf-streaming');
-                    this.scrollToBottom();
-                }
-            } else {
-                // Fallback: basic formatting
-                if (isStreaming) {
-                    textElement.textContent = text;
-                    const cursor = document.createElement('span');
-                    cursor.className = 'bf-cursor';
-                    textElement.appendChild(cursor);
-                    messageDiv.classList.add('bf-streaming');
-                    this.smartScroll();
-                } else {
-                    textElement.innerHTML = this.formatMarkdown(text);
-                    messageDiv.classList.remove('bf-streaming');
-                    this.scrollToBottom();
-                }
+        formatMessage(text) {
+            if (!this.config.enableMarkdown) {
+                return this.escapeHtml(text).replace(/\n/g, '<br>');
             }
-        }
 
-        smartScroll() {
-            const container = document.getElementById('bf-messages');
-            if (!container) return;
-            
-            const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
-            
-            if (isNearBottom) {
-                if (this.scrollAnimationFrame) {
-                    cancelAnimationFrame(this.scrollAnimationFrame);
-                }
-                
-                this.scrollAnimationFrame = requestAnimationFrame(() => {
-                    container.scrollTop = container.scrollHeight;
-                    this.scrollAnimationFrame = null;
-                });
-            }
-        }
-
-        formatMarkdown(text) {
-            if (!this.config.enableMarkdown) return this.escapeHtml(text).replace(/\n/g, '<br>');
-            
-            // Use marked.js if available
-            if (this.marked && this.DOMPurify) {
-                try {
-                    const rawHtml = this.marked.parse(text);
-                    const sanitizedHtml = this.DOMPurify.sanitize(rawHtml);
-                    return sanitizedHtml;
-                } catch (error) {
-                    this.log('Markdown parsing error, falling back:', error);
-                    // Fall through to basic formatting
-                }
-            }
-            
-            // Fallback: basic formatting
             let html = this.escapeHtml(text);
-            
-            // Headers
+
+            html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+            html = html.replace(/_(.+?)_/g, '<em>$1</em>');
+            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+            html = html.replace(/^(\d+\. .+)$/gm, '<li>$1</li>');
+            html = html.replace(/(<li>\d+\. .+<\/li>\n?)+/g, '<ol>$&</ol>');
+            html = html.replace(/<li>(\d+)\. (.+?)<\/li>/g, '<li>$2</li>');
+            html = html.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.+<\/li>\n?)+/g, (match) => {
+                if (!match.includes('<ol>')) {
+                    return '<ul>' + match + '</ul>';
+                }
+                return match;
+            });
             html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
             html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
             html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-            
-            // Bold
-            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-            html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
-            
-            // Italic
-            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-            html = html.replace(/_(.+?)_/g, '<em>$1</em>');
-            
-            // Code blocks
-            html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-            
-            // Inline code
-            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-            
-            // Links
-            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
-                try {
-                    const urlObj = new URL(url, window.location.href);
-                    if (!CONSTANTS.ALLOWED_URL_SCHEMES.includes(urlObj.protocol)) {
-                        return match;
-                    }
-                    return `<a href="${this.escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
-                } catch {
-                    return match;
-                }
-            });
-            
-            // Lists
-            html = html.replace(/^\d+\.\s+(.+)$/gm, '<li data-list="ol">$1</li>');
-            html = html.replace(/^[\-\*]\s+(.+)$/gm, '<li data-list="ul">$1</li>');
-            html = html.replace(/(<li[^>]*>.+?<\/li>(?:\n<li[^>]*>.+?<\/li>)*)/g, (match) => {
-                const listType = match.includes('data-list="ol"') ? 'ol' : 'ul';
-                const cleaned = match.replace(/ data-list="[^"]+"/g, '');
-                return `<${listType}>${cleaned}</${listType}>`;
-            });
-            
-            // Paragraphs
             html = html.replace(/\n\n/g, '</p><p>');
             html = html.replace(/\n/g, '<br>');
             html = '<p>' + html + '</p>';
             html = html.replace(/<p><\/p>/g, '');
             html = html.replace(/<p>(<[uo]l>)/g, '$1');
             html = html.replace(/(<\/[uo]l>)<\/p>/g, '$1');
-            html = html.replace(/<p>(<h[123]>)/g, '$1');
-            html = html.replace(/(<\/h[123]>)<\/p>/g, '$1');
             html = html.replace(/<p>(<pre>)/g, '$1');
             html = html.replace(/(<\/pre>)<\/p>/g, '$1');
-            
+
             return html;
         }
 
-        scrollToBottom() {
-            const container = document.getElementById('bf-messages');
-            if (container) {
-                container.scrollTop = container.scrollHeight;
+        showTyping(show) {
+            const typingIndicator = document.getElementById('bf-typing');
+            typingIndicator.style.display = show ? 'flex' : 'none';
+
+            if (show) {
+                const messagesContainer = document.getElementById('bf-messages');
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
         }
 
         getTimeString() {
-            return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const now = new Date();
+            return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         }
 
         escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
-        }
-
-        destroy() {
-            if (this.abortController) {
-                this.abortController.abort();
-            }
-            
-            if (this.streamUpdateTimer) {
-                clearTimeout(this.streamUpdateTimer);
-            }
-            
-            if (this.scrollAnimationFrame) {
-                cancelAnimationFrame(this.scrollAnimationFrame);
-            }
-            
-            this.removeEventListeners();
-            
-            const container = document.getElementById('beautiful-flowise-container');
-            if (container) {
-                container.remove();
-            }
-            
-            this.log('Widget destroyed');
         }
     }
 
@@ -1660,18 +1453,35 @@
             console.error('BeautifulFlowiseChat: apiHost is required');
             return false;
         }
+        if (config.captcha !== undefined && config.captcha !== null) {
+            if (typeof config.captcha !== 'object') {
+                console.error('BeautifulFlowiseChat: captcha must be an object');
+                return false;
+            }
+            const provider = String(config.captcha.provider || 'turnstile').toLowerCase();
+            if (provider !== 'turnstile') {
+                console.error('BeautifulFlowiseChat: captcha.provider must be "turnstile"');
+                return false;
+            }
+            if (!config.captcha.siteKey || typeof config.captcha.siteKey !== 'string') {
+                console.error('BeautifulFlowiseChat: captcha.siteKey is required');
+                return false;
+            }
+        }
         return true;
     }
 
     window.BeautifulFlowiseChat = {
         init: function(config) {
-            if (!validateConfig(config)) return null;
-            return new BeautifulFlowiseChat({ ...config, mode: 'popup' });
+            if (!validateConfig(config)) {
+                return null;
+            }
+            return new BeautifulFlowiseChat(config);
         },
-        
         initFull: function(config) {
-            if (!validateConfig(config)) return null;
-            return new BeautifulFlowiseChat({ ...config, mode: 'fullscreen' });
+            config.position = 'fullscreen';
+            return this.init(config);
         }
     };
+
 })();
