@@ -152,7 +152,7 @@
 
                     <div class="bf-footer">
                         <a href="mailto:mail.rps.active@proton.me" class="bf-branding">
-                            mail.rps.active@proton.me
+                            Powered by RPS
                         </a>
                     </div>
                 </div>
@@ -723,17 +723,144 @@
             const messageDiv = document.createElement('div');
             messageDiv.className = `bf-message bf-${sender}-message ${isError ? 'bf-error' : ''}`;
 
-            const formattedText = sender === 'bot' ? this.formatMessage(text) : this.escapeHtml(text);
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'bf-message-content';
 
-            messageDiv.innerHTML = `
-                <div class="bf-message-content">
-                    <div class="bf-message-text">${formattedText}</div>
-                    ${this.config.showTimestamp ? `<div class="bf-message-time">${this.getTimeString()}</div>` : ''}
-                </div>
-            `;
+            const textDiv = document.createElement('div');
+            textDiv.className = 'bf-message-text';
+
+            if (sender === 'bot') {
+                // Bot responses can include markdown. Render with a strict allowlist sanitizer to avoid DOM XSS.
+                textDiv.innerHTML = this.formatMessage(text);
+            } else {
+                // User messages must be treated as plain text.
+                textDiv.textContent = text;
+            }
+
+            contentDiv.appendChild(textDiv);
+
+            if (this.config.showTimestamp) {
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'bf-message-time';
+                timeDiv.textContent = this.getTimeString();
+                contentDiv.appendChild(timeDiv);
+            }
+
+            messageDiv.appendChild(contentDiv);
 
             messagesContainer.appendChild(messageDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        decodeHtmlEntities(text) {
+            const value = typeof text === 'string' ? text : '';
+            const textarea = document.createElement('textarea');
+            textarea.innerHTML = value;
+            return textarea.value;
+        }
+
+        escapeHtmlAttribute(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        sanitizeUrl(rawUrl) {
+            if (typeof rawUrl !== 'string') return null;
+            const trimmed = rawUrl.trim();
+            if (!trimmed) return null;
+
+            // Normalize away control chars + whitespace to prevent scheme smuggling (e.g. "java\tscript:").
+            const normalized = trimmed.replace(/[\u0000-\u001F\u007F\s]+/g, '').toLowerCase();
+
+            // Allow safe same-page / relative links.
+            if (normalized.startsWith('#') || normalized.startsWith('?') || normalized.startsWith('/')) {
+                // Block protocol-relative and backslash variants.
+                if (normalized.startsWith('//') || normalized.startsWith('/\\') || normalized.startsWith('\\')) return null;
+                return trimmed;
+            }
+
+            try {
+                const parsed = new URL(trimmed, window.location.origin);
+                const protocol = String(parsed.protocol || '').toLowerCase();
+                if (protocol === 'http:' || protocol === 'https:' || protocol === 'mailto:' || protocol === 'tel:') {
+                    return parsed.href;
+                }
+            } catch {
+                // ignore
+            }
+
+            return null;
+        }
+
+        unwrapElement(element) {
+            const parent = element && element.parentNode;
+            if (!parent) return;
+            while (element.firstChild) {
+                parent.insertBefore(element.firstChild, element);
+            }
+            parent.removeChild(element);
+        }
+
+        sanitizeFormattedHtml(html) {
+            const template = document.createElement('template');
+            template.innerHTML = String(html || '');
+
+            const allowedTags = new Set([
+                'A',
+                'BR',
+                'CODE',
+                'EM',
+                'H1',
+                'H2',
+                'H3',
+                'LI',
+                'OL',
+                'P',
+                'PRE',
+                'STRONG',
+                'UL'
+            ]);
+
+            const elements = [];
+            const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_ELEMENT, null);
+            while (walker.nextNode()) {
+                elements.push(walker.currentNode);
+            }
+
+            // Process deep-to-shallow to make unwrap operations predictable.
+            for (let i = elements.length - 1; i >= 0; i -= 1) {
+                const el = elements[i];
+                const tag = el.tagName;
+
+                if (!allowedTags.has(tag)) {
+                    this.unwrapElement(el);
+                    continue;
+                }
+
+                const rawHref = tag === 'A' ? el.getAttribute('href') : null;
+
+                // Strip all attributes first (including event handlers, styles, etc).
+                for (const attr of Array.from(el.attributes)) {
+                    el.removeAttribute(attr.name);
+                }
+
+                if (tag === 'A') {
+                    const safeHref = this.sanitizeUrl(rawHref || '');
+                    if (!safeHref) {
+                        this.unwrapElement(el);
+                        continue;
+                    }
+                    el.setAttribute('href', safeHref);
+                    el.setAttribute('target', '_blank');
+                    el.setAttribute('rel', 'noopener noreferrer nofollow');
+                }
+            }
+
+            return template.innerHTML;
         }
 
         formatMessage(text) {
@@ -749,7 +876,12 @@
             html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
             html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
             html = html.replace(/_(.+?)_/g, '<em>$1</em>');
-            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, rawUrl) => {
+                const decodedUrl = this.decodeHtmlEntities(rawUrl);
+                const safeHref = this.sanitizeUrl(decodedUrl);
+                if (!safeHref) return String(linkText || '');
+                return `<a href="${this.escapeHtmlAttribute(safeHref)}" target="_blank" rel="noopener noreferrer nofollow">${linkText}</a>`;
+            });
             html = html.replace(/^(\d+\. .+)$/gm, '<li>$1</li>');
             html = html.replace(/(<li>\d+\. .+<\/li>\n?)+/g, '<ol>$&</ol>');
             html = html.replace(/<li>(\d+)\. (.+?)<\/li>/g, '<li>$2</li>');
@@ -772,7 +904,7 @@
             html = html.replace(/<p>(<pre>)/g, '$1');
             html = html.replace(/(<\/pre>)<\/p>/g, '$1');
 
-            return html;
+            return this.sanitizeFormattedHtml(html);
         }
 
         showTyping(show) {
