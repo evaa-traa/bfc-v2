@@ -96,7 +96,16 @@
                                 <div class="bf-subtitle">${this.config.subtitle}</div>
                             </div>
                         </div>
-                        <button class="bf-minimize-btn" id="bf-minimize" aria-label="Minimize chat">-</button>
+                        <div class="bf-header-actions">
+                            <button class="bf-header-btn" id="bf-new-chat" aria-label="New conversation" title="New conversation">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M3 6h18"></path>
+                                    <path d="M8 6V4h8v2"></path>
+                                    <path d="M6 6l1 16h10l1-16"></path>
+                                </svg>
+                            </button>
+                            <button class="bf-minimize-btn" id="bf-minimize" aria-label="Minimize chat">-</button>
+                        </div>
                     </div>
 
                     <div class="bf-messages" id="bf-messages">
@@ -140,8 +149,8 @@
                     </div>
 
                     <div class="bf-footer">
-                        <a href="https://github.com/unknownfriend00007/beautiful-flowise-chat" target="_blank" rel="noopener noreferrer" class="bf-branding">
-                            Powered by Beautiful Flowise Chat
+                        <a href="mailto:mail.rps.active@proton.me" class="bf-branding">
+                            mail.rps.active@proton.me
                         </a>
                     </div>
                 </div>
@@ -153,11 +162,15 @@
         attachEventListeners() {
             const toggleBtn = document.getElementById('bf-toggle-button');
             const minimizeBtn = document.getElementById('bf-minimize');
+            const newChatBtn = document.getElementById('bf-new-chat');
             const sendBtn = document.getElementById('bf-send');
             const input = document.getElementById('bf-input');
 
             toggleBtn.addEventListener('click', () => this.toggleChat());
             minimizeBtn.addEventListener('click', () => this.toggleChat());
+            if (newChatBtn) {
+                newChatBtn.addEventListener('click', () => this.startNewConversation());
+            }
             sendBtn.addEventListener('click', () => this.sendMessage());
 
             input.addEventListener('keydown', (event) => {
@@ -171,6 +184,39 @@
                 input.style.height = 'auto';
                 input.style.height = Math.min(input.scrollHeight, 120) + 'px';
             });
+        }
+
+        getWelcomeMarkup() {
+            if (!this.config.welcomeMessage) return '';
+            return `
+                <div class="bf-message bf-bot-message">
+                    <div class="bf-message-avatar">${this.config.avatar}</div>
+                    <div class="bf-message-content">
+                        <div class="bf-message-text">${this.formatMessage(this.config.welcomeMessage)}</div>
+                        ${this.config.showTimestamp ? `<div class="bf-message-time">${this.getTimeString()}</div>` : ''}
+                    </div>
+                </div>`;
+        }
+
+        startNewConversation() {
+            this.conversationHistory = [];
+            this.currentStreamingMessage = null;
+            this.showTyping(false);
+
+            const messagesContainer = document.getElementById('bf-messages');
+            if (messagesContainer) {
+                messagesContainer.innerHTML = this.getWelcomeMarkup();
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+
+            const overlay = document.getElementById('bf-human-check');
+            const isOverlayVisible = overlay && overlay.style.display !== 'none';
+            if (!isOverlayVisible) {
+                const input = document.getElementById('bf-input');
+                const sendBtn = document.getElementById('bf-send');
+                if (input) input.disabled = false;
+                if (sendBtn) sendBtn.disabled = false;
+            }
         }
 
         toggleChat() {
@@ -285,6 +331,60 @@
             }
         }
 
+        getHumanCheckErrorMessage(error) {
+            if (error && typeof error.message === 'string' && error.message.trim()) {
+                return error.message.trim();
+            }
+            return 'Verification failed. Please try again.';
+        }
+
+        shouldAutoResetTurnstile(error) {
+            const reason = error && typeof error.reason === 'string'
+                ? error.reason.trim().toLowerCase()
+                : '';
+
+            // Configuration errors will not be fixed by retrying the captcha challenge.
+            if (reason === 'invalid-hostname') {
+                return false;
+            }
+            return true;
+        }
+
+        async createTokenEndpointError(response) {
+            let message = '';
+            let reason = '';
+
+            try {
+                const bodyText = await response.text();
+                if (bodyText) {
+                    try {
+                        const payload = JSON.parse(bodyText);
+                        if (payload && typeof payload === 'object') {
+                            if (typeof payload.message === 'string') {
+                                message = payload.message.trim();
+                            } else if (typeof payload.error === 'string') {
+                                message = payload.error.trim();
+                            }
+                            if (typeof payload.reason === 'string') {
+                                reason = payload.reason.trim().toLowerCase();
+                            }
+                        }
+                    } catch {
+                        message = bodyText.trim();
+                    }
+                }
+            } catch {
+                // ignore read/parsing failures
+            }
+
+            const error = new Error(message || `Token endpoint failed: ${response.status}`);
+            error.status = response.status;
+            if (reason) {
+                error.reason = reason;
+            }
+            return error;
+        }
+
         isCaptchaEnabled() {
             return !!(
                 this.config.captcha &&
@@ -364,7 +464,7 @@
             if (autoStart) {
                 this.ensureProxyAuth({ restoreUi: true }).catch((error) => {
                     this.log('Captcha flow failed:', error);
-                    this.setHumanCheckError('Verification failed. Please try again.');
+                    this.setHumanCheckError(this.getHumanCheckErrorMessage(error));
                 });
             }
         }
@@ -499,7 +599,7 @@
                 }, this.config.requestTimeout);
 
                 if (!response.ok) {
-                    throw new Error(`Token endpoint failed: ${response.status}`);
+                    throw await this.createTokenEndpointError(response);
                 }
 
                 const data = await response.json();
@@ -525,8 +625,10 @@
                 await this.proxyAuthInFlight;
             } catch (error) {
                 this.setHumanCheckStatus('');
-                this.setHumanCheckError('Verification failed. Please try again.');
-                this.resetTurnstile();
+                this.setHumanCheckError(this.getHumanCheckErrorMessage(error));
+                if (this.shouldAutoResetTurnstile(error)) {
+                    this.resetTurnstile();
+                }
                 throw error;
             } finally {
                 this.proxyAuthInFlight = null;
