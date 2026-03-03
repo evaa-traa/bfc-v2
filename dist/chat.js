@@ -760,6 +760,9 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
             this.chatflowid = config.chatflowid;
             this.apiHost = config.apiHost;
             this.conversationHistory = [];
+            this.storageKey = `bfc_session_${this.chatflowid}`;
+            this.chatId = null;
+            this.sessionId = null;
             this.isOpen = false;
             this.isTyping = false;
             this.currentStreamingMessage = null;
@@ -777,6 +780,7 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
             this.injectStyles();
             this.createWidget();
             this.attachEventListeners();
+            this.loadSessionFromStorage();
             this.initializeHumanCheck();
         }
 
@@ -836,7 +840,6 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
                     <div class="bf-messages" id="bf-messages">
                         ${this.config.welcomeMessage ? `
                         <div class="bf-message bf-bot-message">
-                            <div class="bf-message-avatar">${this.config.avatar}</div>
                             <div class="bf-message-content">
                                 <div class="bf-message-text">${this.formatMessage(this.config.welcomeMessage)}</div>
                                 ${this.config.showTimestamp ? `<div class="bf-message-time">${this.getTimeString()}</div>` : ''}
@@ -855,7 +858,6 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
                     </div>
 
                     <div class="bf-typing" id="bf-typing" style="display: none;">
-                        <div class="bf-typing-avatar">${this.config.avatar}</div>
                         <div class="bf-typing-dots">
                             <span></span><span></span><span></span>
                         </div>
@@ -911,11 +913,64 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
             });
         }
 
+        generateId() {
+            if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+                return crypto.randomUUID();
+            }
+            return `sid-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+        }
+
+        loadSessionFromStorage() {
+            try {
+                const stored = localStorage.getItem(this.storageKey);
+                if (!stored) {
+                    this.sessionId = this.generateId();
+                    return;
+                }
+
+                const parsed = JSON.parse(stored);
+                if (parsed && typeof parsed === 'object') {
+                    if (typeof parsed.chatId === 'string' && parsed.chatId.trim()) {
+                        this.chatId = parsed.chatId.trim();
+                    }
+                    if (typeof parsed.sessionId === 'string' && parsed.sessionId.trim()) {
+                        this.sessionId = parsed.sessionId.trim();
+                    }
+                }
+            } catch {
+                this.chatId = null;
+            }
+
+            if (!this.sessionId) {
+                this.sessionId = this.generateId();
+            }
+            this.saveSessionToStorage();
+        }
+
+        saveSessionToStorage() {
+            try {
+                const payload = {
+                    chatId: this.chatId,
+                    sessionId: this.sessionId
+                };
+                localStorage.setItem(this.storageKey, JSON.stringify(payload));
+            } catch {
+                // Ignore storage errors (private mode or blocked storage).
+            }
+        }
+
+        clearSessionStorage() {
+            try {
+                localStorage.removeItem(this.storageKey);
+            } catch {
+                // Ignore storage errors.
+            }
+        }
+
         getWelcomeMarkup() {
             if (!this.config.welcomeMessage) return '';
             return `
                 <div class="bf-message bf-bot-message">
-                    <div class="bf-message-avatar">${this.config.avatar}</div>
                     <div class="bf-message-content">
                         <div class="bf-message-text">${this.formatMessage(this.config.welcomeMessage)}</div>
                         ${this.config.showTimestamp ? `<div class="bf-message-time">${this.getTimeString()}</div>` : ''}
@@ -925,6 +980,10 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
 
         startNewConversation() {
             this.conversationHistory = [];
+            this.chatId = null;
+            this.sessionId = this.generateId();
+            this.clearSessionStorage();
+            this.saveSessionToStorage();
             this.currentStreamingMessage = null;
             this.showTyping(false);
 
@@ -1000,6 +1059,25 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
             this.log('Sending message:', message);
             this.log('API Host:', this.apiHost);
             this.log('Chatflow ID:', this.chatflowid);
+            this.log('Session ID:', this.sessionId);
+            this.log('Chat ID:', this.chatId || 'none');
+
+            const requestBody = {
+                question: message,
+                history: this.conversationHistory
+            };
+
+            if (this.chatId) {
+                requestBody.chatId = this.chatId;
+            }
+
+            const baseOverride = (this.config.overrideConfig && typeof this.config.overrideConfig === 'object')
+                ? { ...this.config.overrideConfig }
+                : {};
+            requestBody.overrideConfig = {
+                ...baseOverride,
+                sessionId: this.sessionId
+            };
 
             const response = await this.fetchWithTimeout(`${this.apiHost}/api/v1/prediction/${this.chatflowid}`, {
                 method: 'POST',
@@ -1007,10 +1085,7 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
                     'Content-Type': 'application/json',
                     ...this.getProxyAuthHeaders()
                 },
-                body: JSON.stringify({
-                    question: message,
-                    history: this.conversationHistory
-                })
+                body: JSON.stringify(requestBody)
             }, this.config.requestTimeout);
 
             this.log('Response status:', response.status);
@@ -1030,6 +1105,14 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
 
             const data = await response.json();
             this.log('Response data:', data);
+
+            if (data && typeof data.chatId === 'string' && data.chatId.trim()) {
+                if (data.chatId !== this.chatId) {
+                    this.chatId = data.chatId.trim();
+                    this.saveSessionToStorage();
+                    this.log('Chat ID assigned:', this.chatId);
+                }
+            }
 
             this.showTyping(false);
 
@@ -1368,7 +1451,6 @@ window.BEAUTIFUL_FLOWISE_STYLES = `
             const formattedText = sender === 'bot' ? this.formatMessage(text) : this.escapeHtml(text);
 
             messageDiv.innerHTML = `
-                ${sender === 'bot' ? `<div class="bf-message-avatar">${this.config.avatar}</div>` : ''}
                 <div class="bf-message-content">
                     <div class="bf-message-text">${formattedText}</div>
                     ${this.config.showTimestamp ? `<div class="bf-message-time">${this.getTimeString()}</div>` : ''}
